@@ -16,28 +16,22 @@ export class MyRoom extends Room<MyRoomState> {
 
             const player = this.state.players.get(client.sessionId);
             if (!player) { return; }
-            
-            const roll = Math.floor(Math.random() * 6) + 1;
-            player.history.push(roll); // पासे का नंबर इतिहास में जोड़ें, स्कोर अभी नहीं
 
-            // सर्वर केवल क्लाइंट को पासा रोल करने के लिए कहता है, स्कोर अभी अपडेट नहीं करता।
-            // क्लाइंट को अपनी sessionId भी भेजें ताकि वह पहचान सके कि यह उसका रोल है।
+            const roll = Math.floor(Math.random() * 6) + 1;
+            player.history.push(roll);
+
             this.broadcast("dice_rolled", { roll, player: player.playerNumber, sessionId: client.sessionId });
         });
 
-        // नया मैसेज हैंडलर: जब क्लाइंट बताता है कि पासा एनीमेशन पूरा हो गया है
         this.onMessage("animation_completed", (client, message) => {
             const player = this.state.players.get(client.sessionId);
             if (!player) { return; }
 
-            // सुनिश्चित करें कि यह सही रोल है जिसका एनीमेशन पूरा हुआ है (ताकि कोई धोखाधड़ी न हो)
-            const latestRoll = player.history[player.history.length - 1]; // इतिहास से नवीनतम रोल प्राप्त करें
+            const latestRoll = player.history[player.history.length - 1];
 
-            // यदि मैसेज में भेजा गया रोल और इतिहास का नवीनतम रोल मैच करता है, तो स्कोर अपडेट करें
             if (message.roll === latestRoll) {
-                player.score += latestRoll; // *** अब स्कोर अपडेट करें ***
-                
-                // अब बारी बदलने और गेम खत्म करने का लॉजिक यहां आएगा
+                player.score += latestRoll;
+
                 const everyPlayerHasRolledMaxTurns = Array.from(this.state.players.values())
                     .every(p => p.history.length === this.TOTAL_TURNS);
 
@@ -46,8 +40,8 @@ export class MyRoom extends Room<MyRoomState> {
                 } else {
                     const playerIds = Array.from(this.state.players.keys());
                     const nextPlayerId = playerIds.find(id => id !== client.sessionId);
-                    this.state.currentPlayerId = nextPlayerId || null;
-                    
+                    this.state.currentPlayerId = nextPlayerId || "";
+
                     const totalRolls = Array.from(this.state.players.values()).reduce((sum, p) => sum + p.history.length, 0);
                     this.state.currentRound = Math.floor(totalRolls / this.maxClients) + 1;
                 }
@@ -55,13 +49,13 @@ export class MyRoom extends Room<MyRoomState> {
                 console.warn(`Mismatch in animation_completed roll for ${client.sessionId}. Expected ${latestRoll}, got ${message.roll}`);
             }
         });
-        
+
         this.onMessage("reset_game", () => this.resetGame());
     }
 
     onJoin(client: Client, options: any) {
         console.log(client.sessionId, "join ho gaya!");
-        
+
         const player = new Player();
         player.playerNumber = this.state.players.size + 1;
         player.sessionId = client.sessionId;
@@ -69,7 +63,7 @@ export class MyRoom extends Room<MyRoomState> {
 
         if (this.state.players.size === this.maxClients) {
             this.state.currentRound = 1;
-            this.state.currentPlayerId = Array.from(this.state.players.keys())[0] || null;
+            this.state.currentPlayerId = Array.from(this.state.players.keys())[0] || "";
             this.broadcast("chat", { senderName: "Server", text: "Game Shuru!" });
         }
     }
@@ -85,9 +79,9 @@ export class MyRoom extends Room<MyRoomState> {
             this.state.finalScores.set("2", player2.score);
             if (player1.score > player2.score) { this.state.winnerSessionId = player1.sessionId; }
             else if (player2.score > player1.score) { this.state.winnerSessionId = player2.sessionId; }
-            else { this.state.winnerSessionId = null; }
+            else { this.state.winnerSessionId = ""; }
         }
-        
+
         this.broadcast("game_over", {
             finalScores: Object.fromEntries(this.state.finalScores),
             winnerId: this.state.winnerSessionId,
@@ -96,26 +90,14 @@ export class MyRoom extends Room<MyRoomState> {
 
     resetGame() {
         this.state.gameOver = false;
-        this.state.winnerSessionId = null;
+        this.state.winnerSessionId = "";
         this.state.currentRound = 1;
         this.state.finalScores.clear();
+
         this.state.players.forEach(player => {
             player.score = 0;
-            player.history.clear();
+            player.history = []; // ✅ clear() की जगह array reset
         });
-        
-        this.state.currentPlayerId = Array.from(this.state.players.keys())[0] || null;
-        this.broadcast("chat", { senderName: "Server", text: "Game reset ho gaya hai!" });
-    }
 
-    onLeave(client: Client, consented: boolean) {
-        console.log(client.sessionId, "chala गया!");
-        if (this.state.players.has(client.sessionId)) {
-            this.state.players.delete(client.sessionId);
-        }
-    }
-
-    onDispose() {
-        console.log("Room band ho gaya:", this.roomId);
-    }
-}
+        this.state.currentPlayerId = Array.from(this.state.players.keys())[0] || "";
+        this.broadcast("chat", { senderName: "Server", text: "Gam
