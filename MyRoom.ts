@@ -96,8 +96,21 @@ export class MyRoom extends Room<MyRoomState> {
 
         this.state.players.forEach(player => {
             player.score = 0;
-            player.history = []; // ✅ clear() की जगह array reset
+            player.history = []; // ✅ array reset
         });
 
         this.state.currentPlayerId = Array.from(this.state.players.keys())[0] || "";
-        this.broadcast("chat", { senderName: "Server", text: "Gam
+        this.broadcast("chat", { senderName: "Server", text: "Game reset ho gaya hai!" });
+    }
+
+    onLeave(client: Client, consented: boolean) {
+        console.log(client.sessionId, "chala gaya!");
+        if (this.state.players.has(client.sessionId)) {
+            this.state.players.delete(client.sessionId);
+        }
+    }
+
+    onDispose() {
+        console.log("Room band ho gaya:", this.roomId);
+    }
+}
